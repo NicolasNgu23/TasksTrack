@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { supabase } from '@/lib/supabase';
-import LoginScreen from '@/components/login';
+import LoginScreen from '@/components/Login';
 import Dashboard from '@/components/Dashboard';
 
 export default function IndexPage() {
