@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Alert, StyleSheet } from 'react-native';
+import { View, Text, Alert, StyleSheet } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
 import MapView, { Marker, MapPressEvent } from 'react-native-maps';
@@ -60,17 +60,22 @@ export default function AddTaskScreen() {
     }
 
     const user = (await supabase.auth.getUser()).data.user;
-    const point = `POINT(${marker.longitude} ${marker.latitude})`;
 
     const { error } = await supabase.rpc('create_task', {
       p_user_id: user?.id,
       p_title: title,
       p_description: desc,
-      p_location_text: point,
+      p_latitude: marker.latitude,
+      p_longitude: marker.longitude,
     });
 
     if (error) Alert.alert('Erreur', error.message);
-    else router.replace('/');
+    else
+    setTitle('');
+    setDesc('');
+    setAddress('');
+    setMarker(null);
+    router.replace('/');
   };
 
   return (
@@ -95,7 +100,6 @@ export default function AddTaskScreen() {
       />
       <CustomButton title="Valider l'adresse" onPress={handleGeocode} />
 
-
       <MapView
         ref={(ref) => (mapRef.current = ref)}
         style={styles.map}
@@ -109,6 +113,7 @@ export default function AddTaskScreen() {
       >
         {marker && <Marker coordinate={marker} />}
       </MapView>
+
       <CustomButton title="Créer la tâche" onPress={handleAddTask} variant="primary" />
     </View>
   );
@@ -118,27 +123,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingVertical: 64,
-    paddingHorizontal:32,
+    paddingHorizontal: 32,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 16
-  },
-  subtitle: {
-    fontSize: 16,
-    marginTop: 12,
-    marginBottom: 8
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  textArea: {
-    height: 100,
   },
   map: {
     width: '100%',

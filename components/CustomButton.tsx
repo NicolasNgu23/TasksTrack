@@ -2,7 +2,7 @@ import { Text, TouchableOpacity, StyleSheet } from 'react-native';
 
 type Props = {
   title: string;
-  onPress: () => void;
+  onPress?: () => void;
   variant?: 'primary' | 'outlined';
 };
 
@@ -22,10 +22,10 @@ export default function CustomButton({ title, onPress, variant = 'outlined' }: P
 const styles = StyleSheet.create({
   base: {
     borderRadius: 10,
-    paddingVertical: 12,
+    paddingVertical: 8,
     paddingHorizontal: 24,
     alignItems: 'center',
-    marginBottom: 16,
+    marginVertical: 8,
   },
   primary: {
     backgroundColor: '#1C008A',
