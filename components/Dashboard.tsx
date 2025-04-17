@@ -1,16 +1,11 @@
-import { useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Alert,
-  ScrollView,
-} from 'react-native';
+import { useState, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, Alert, ScrollView } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useFocusEffect } from 'expo-router';
 import MapView, { Marker } from 'react-native-maps';
 import CustomButton from '@/components/CustomButton';
 import * as Location from 'expo-location';
+import { startBackgroundTracking } from '@/lib/backgroundNotifications'; // Import de la fonction de notifications en arrière-plan
 
 type Task = {
   id: string;
@@ -63,7 +58,7 @@ export default function Dashboard() {
   };
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371;
+    const R = 6371; // Rayon de la Terre en km
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
     const a =
@@ -73,7 +68,7 @@ export default function Dashboard() {
         Math.sin(dLon / 2) *
         Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+    return R * c; // Distance en km
   };
 
   const sortTasksByDistance = async () => {
@@ -98,17 +93,18 @@ export default function Dashboard() {
     setSortByDistance(true);
   };
 
-  const tasksWithCoords = tasks.filter(
+  const tasksWithCoords = tasks?.filter(
     (t) =>
       typeof t.latitude === 'number' &&
       typeof t.longitude === 'number' &&
       !isNaN(t.latitude) &&
       !isNaN(t.longitude)
-  );
+  ) || [];
 
   useFocusEffect(
     useCallback(() => {
       fetchTasks();
+      startBackgroundTracking(); // Lancer le suivi des notifications en arrière-plan
     }, [])
   );
 
