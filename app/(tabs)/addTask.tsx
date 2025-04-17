@@ -51,7 +51,6 @@ export default function AddTaskScreen() {
         onChangeText={setDesc}
       />
 
-      {/* <Text style={styles.subtitle}></Text> */}
       <MapView
         style={styles.map}
         initialRegion={{
@@ -71,21 +70,9 @@ export default function AddTaskScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingVertical:52,
-    paddingHorizontal:24,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16
-  },
-  subtitle: {
-    fontSize: 16,
-    marginTop: 12,
-    marginBottom: 8
-  },
+  container: { flex: 1, padding: 16 },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 16 },
+  subtitle: { fontSize: 16, marginTop: 12, marginBottom: 8 },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
