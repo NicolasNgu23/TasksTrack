@@ -1,5 +1,3 @@
-// contexts/UserLocationContext.tsx
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import * as Location from 'expo-location';
 
