@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { View, Text, Alert, StyleSheet } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { router } from 'expo-router';
@@ -6,13 +6,26 @@ import MapView, { Marker, MapPressEvent } from 'react-native-maps';
 import * as Location from 'expo-location';
 import CustomInput from '@/components/CustomInput';
 import CustomButton from '@/components/CustomButton';
+import { useUserLocation } from '@/context/UserLocationContext';
 
 export default function AddTaskScreen() {
+  const { location, refreshLocation } = useUserLocation();
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
   const [address, setAddress] = useState('');
   const [marker, setMarker] = useState<{ latitude: number; longitude: number } | null>(null);
   const mapRef = useRef<MapView | null>(null);
+
+  useEffect(() => {
+    if (location && !marker && mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: location.latitude,
+        longitude: location.longitude,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      });
+    }
+  }, [location]);
 
   const handleMapPress = async (e: MapPressEvent) => {
     const { latitude, longitude } = e.nativeEvent.coordinate;
@@ -54,29 +67,36 @@ export default function AddTaskScreen() {
   };
 
   const handleAddTask = async () => {
-    if (!title || !marker) {
+    const user = (await supabase.auth.getUser()).data.user;
+
+    if (!title || (!marker && !location)) {
       Alert.alert('Champs requis', 'Ajoute un titre et une localisation.');
       return;
     }
 
-    const user = (await supabase.auth.getUser()).data.user;
+    const lat = marker?.latitude ?? location?.latitude;
+    const lon = marker?.longitude ?? location?.longitude;
+
+    const point = `POINT(${lon} ${lat})`;
 
     const { error } = await supabase.rpc('create_task', {
       p_user_id: user?.id,
       p_title: title,
+      p_location_text: point,
       p_description: desc,
-      p_latitude: marker.latitude,
-      p_longitude: marker.longitude,
     });
 
-    if (error) Alert.alert('Erreur', error.message);
-    else
-    setTitle('');
-    setDesc('');
-    setAddress('');
-    setMarker(null);
-    router.replace('/');
+    if (error) {
+      Alert.alert('Erreur', error.message);
+    } else {
+      setTitle('');
+      setDesc('');
+      setAddress('');
+      setMarker(null);
+      router.replace('/');
+    }
   };
+
 
   return (
     <View style={styles.container}>
@@ -104,12 +124,13 @@ export default function AddTaskScreen() {
         ref={(ref) => (mapRef.current = ref)}
         style={styles.map}
         initialRegion={{
-          latitude: 48.8566,
-          longitude: 2.3522,
+          latitude: marker?.latitude ?? location?.latitude ?? 48.8566,
+          longitude: marker?.longitude ?? location?.longitude ?? 2.3522,
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         }}
         onPress={handleMapPress}
+        showsUserLocation
       >
         {marker && <Marker coordinate={marker} />}
       </MapView>
@@ -128,7 +149,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 16
+    marginBottom: 16,
   },
   map: {
     width: '100%',
