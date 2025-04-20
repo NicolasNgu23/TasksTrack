@@ -1,7 +1,7 @@
 import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
-import { supabase } from '@/lib/supabase';
+import { supabase } from './supabase';
 
 const TASK_NAME = 'BACKGROUND_PROXIMITY_CHECK';
 
