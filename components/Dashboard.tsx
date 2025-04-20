@@ -1,11 +1,11 @@
 import { useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Alert, ScrollView, TouchableOpacity } from 'react-native';
 import { supabase } from '@/lib/supabase';
 import { useFocusEffect } from 'expo-router';
 import MapView, { Marker } from 'react-native-maps';
 import CustomButton from '@/components/CustomButton';
 import * as Location from 'expo-location';
-import { startBackgroundTracking } from '@/lib/backgroundNotifications'; // Import de la fonction de notifications en arrière-plan
+import { startBackgroundTracking } from '@/lib/backgroundNotifications';
 
 type Task = {
   id: string;
@@ -19,29 +19,36 @@ type Task = {
 };
 
 export default function Dashboard() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [sortByDistance, setSortByDistance] = useState(false);
+  const [allTasks, setAllTasks] = useState<Task[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [sortBy, setSortBy] = useState<'date' | 'distance'>('date');
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  const TASKS_PER_PAGE = 3;
 
   const fetchTasks = async () => {
     const user = (await supabase.auth.getUser()).data.user;
-    const { data } = await supabase
+
+    const { data, error } = await supabase
       .from('tasks')
       .select('*')
-      .eq('user_id', user?.id)
-      .order('created_at', { ascending: false });
+      .eq('user_id', user?.id);
 
-    if (data) setTasks(data);
+    if (!error && data) {
+      setAllTasks(data);
+      setTotalPages(Math.ceil(data.length / TASKS_PER_PAGE));
+    } else {
+      Alert.alert('Erreur chargement des tâches.');
+    }
   };
 
   const deleteAllTasks = async () => {
     const user = (await supabase.auth.getUser()).data.user;
-    const { error } = await supabase
-      .from('tasks')
-      .delete()
-      .eq('user_id', user?.id);
+    const { error } = await supabase.from('tasks').delete().eq('user_id', user?.id);
 
     if (!error) {
-      setTasks([]);
+      setAllTasks([]);
       Alert.alert('Toutes les tâches ont été supprimées.');
     } else {
       Alert.alert('Erreur lors de la suppression des tâches.');
@@ -49,16 +56,12 @@ export default function Dashboard() {
   };
 
   const markTaskAsDone = async (taskId: string) => {
-    const { error } = await supabase
-      .from('tasks')
-      .update({ done: true })
-      .eq('id', taskId);
-
+    const { error } = await supabase.from('tasks').update({ done: true }).eq('id', taskId);
     if (!error) fetchTasks();
   };
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // Rayon de la Terre en km
+    const R = 6371;
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
     const a =
@@ -68,47 +71,77 @@ export default function Dashboard() {
         Math.sin(dLon / 2) *
         Math.sin(dLon / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c; // Distance en km
+    return R * c;
   };
 
-  const sortTasksByDistance = async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission refusée pour accéder à la localisation.');
-      return;
+  const sortTasks = async () => {
+    if (sortBy === 'date') {
+      const sorted = [...allTasks].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      setAllTasks(sorted);
+    } else {
+      if (!userLocation) return;
+
+      const sorted = [...allTasks].sort((a, b) => {
+        if (a.latitude === null || a.longitude === null) return 1;
+        if (b.latitude === null || b.longitude === null) return -1;
+        const distA = calculateDistance(userLocation.latitude, userLocation.longitude, a.latitude, a.longitude);
+        const distB = calculateDistance(userLocation.latitude, userLocation.longitude, b.latitude, b.longitude);
+        return distA - distB;
+      });
+      setAllTasks(sorted);
     }
-
-    const location = await Location.getCurrentPositionAsync({});
-    const { latitude: userLat, longitude: userLon } = location.coords;
-
-    const sorted = [...tasks].sort((a, b) => {
-      if (a.latitude === null || a.longitude === null) return 1;
-      if (b.latitude === null || b.longitude === null) return -1;
-      const distA = calculateDistance(userLat, userLon, a.latitude, a.longitude);
-      const distB = calculateDistance(userLat, userLon, b.latitude, b.longitude);
-      return distA - distB;
-    });
-
-    setTasks(sorted);
-    setSortByDistance(true);
   };
 
-  const tasksWithCoords = tasks?.filter(
+  const toggleSort = async () => {
+    const nextSort = sortBy === 'date' ? 'distance' : 'date';
+    setSortBy(nextSort);
+
+    if (nextSort === 'distance' && !userLocation) {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission refusée pour la localisation.');
+        return;
+      }
+
+      const loc = await Location.getCurrentPositionAsync({});
+      setUserLocation({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+      });
+
+      setTimeout(sortTasks, 100); // laisser le temps de set l'état avant de trier
+    } else {
+      sortTasks();
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchTasks();
+      startBackgroundTracking();
+    }, [])
+  );
+
+  useEffect(() => {
+    sortTasks();
+  }, [sortBy, userLocation]);
+
+  const paginatedTasks = allTasks.slice(
+    (currentPage - 1) * TASKS_PER_PAGE,
+    currentPage * TASKS_PER_PAGE
+  );
+
+  const tasksWithCoords = paginatedTasks.filter(
     (t) =>
       typeof t.latitude === 'number' &&
       typeof t.longitude === 'number' &&
       !isNaN(t.latitude) &&
       !isNaN(t.longitude)
-  ) || [];
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchTasks();
-      startBackgroundTracking(); // Lancer le suivi des notifications en arrière-plan
-    }, [])
   );
 
-  if (tasks.length === 0) {
+  if (allTasks.length === 0) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>
@@ -121,21 +154,20 @@ export default function Dashboard() {
   return (
     <View style={styles.container}>
       <CustomButton
-        title="📍 Trier par distance"
+        title={`Trier par : ${sortBy === 'date' ? '📅 Date' : '📍 Distance'}`}
         variant="primary"
-        onPress={sortTasksByDistance}
+        onPress={toggleSort}
       />
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {tasks.map((item) => {
+        {paginatedTasks.map((item) => {
           const createdDate = new Date(item.created_at).toLocaleDateString();
 
           let distance = '';
-          if (item.latitude && item.longitude) {
-            const userLocation = tasksWithCoords[0];
+          if (item.latitude && item.longitude && userLocation) {
             const dist = calculateDistance(
-              userLocation.latitude!,
-              userLocation.longitude!,
+              userLocation.latitude,
+              userLocation.longitude,
               item.latitude,
               item.longitude
             );
@@ -150,7 +182,7 @@ export default function Dashboard() {
               </View>
               <Text>Statut : {item.done ? '✅' : '❌'}</Text>
               <Text style={styles.description}>{item.description}</Text>
-              <Text style={styles.distanceText}>{distance}</Text>
+              {distance !== '' && <Text style={styles.distanceText}>{distance}</Text>}
               {!item.done && (
                 <CustomButton
                   title="Valider tâche"
@@ -186,23 +218,36 @@ export default function Dashboard() {
           </MapView>
         )}
 
+        <View style={styles.pagination}>
+          {[...Array(totalPages)].map((_, i) => (
+            <TouchableOpacity
+              key={i}
+              onPress={() => setCurrentPage(i + 1)}
+              style={[
+                styles.pageButton,
+                currentPage === i + 1 && styles.pageButtonActive,
+              ]}
+            >
+              <Text style={currentPage === i + 1 ? styles.pageTextActive : styles.pageText}>
+                {i + 1}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         <View style={styles.deleteContainer}>
           <CustomButton
             title="🗑️ Supprimer toutes les tâches"
             variant="primary"
             onPress={() => {
-              Alert.alert(
-                'Confirmation',
-                'Es-tu sûr de vouloir supprimer toutes les tâches ?',
-                [
-                  { text: 'Annuler', style: 'cancel' },
-                  {
-                    text: 'Supprimer',
-                    style: 'destructive',
-                    onPress: deleteAllTasks,
-                  },
-                ]
-              );
+              Alert.alert('Confirmation', 'Es-tu sûr de vouloir supprimer toutes les tâches ?', [
+                { text: 'Annuler', style: 'cancel' },
+                {
+                  text: 'Supprimer',
+                  style: 'destructive',
+                  onPress: deleteAllTasks,
+                },
+              ]);
             }}
           />
         </View>
@@ -212,12 +257,7 @@ export default function Dashboard() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: 62,
-    paddingBottom: 24,
-    paddingHorizontal: 26,
-  },
+  container: { flex: 1, paddingTop: 62, paddingBottom: 24, paddingHorizontal: 26 },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -246,25 +286,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  title: {
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  date: {
-    fontSize: 13,
-    color: '#999',
-  },
-  description: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 6,
-  },
-  distanceText: {
-    fontSize: 14,
-    color: '#444',
-    marginTop: 8,
-    fontWeight: '500',
-  },
+  title: { fontSize: 17, fontWeight: '600' },
+  date: { fontSize: 13, color: '#999' },
+  description: { fontSize: 14, color: '#666', marginTop: 6 },
+  distanceText: { fontSize: 14, color: '#444', marginTop: 8, fontWeight: '500' },
   map: {
     width: '100%',
     height: 300,
@@ -272,6 +297,29 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 2,
     borderColor: '#ddd',
+  },
+  pagination: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 20,
+    gap: 8,
+  },
+  pageButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#eee',
+    borderRadius: 8,
+  },
+  pageButtonActive: {
+    backgroundColor: '#1C008A',
+  },
+  pageText: {
+    color: '#333',
+    fontWeight: '600',
+  },
+  pageTextActive: {
+    color: '#fff',
+    fontWeight: '700',
   },
   deleteContainer: {
     marginTop: 32,
