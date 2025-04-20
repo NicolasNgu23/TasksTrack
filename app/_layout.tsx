@@ -8,6 +8,7 @@ import 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/useColorScheme';
 import { TaskProvider } from '@/context/TasksContext';
 import { UserLocationProvider } from '@/context/UserLocationContext';
+import { startBackgroundTracking } from '@/lib/backgroundNotifications';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -20,6 +21,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded) {
       SplashScreen.hideAsync();
+      startBackgroundTracking();
     }
   }, [loaded]);
 

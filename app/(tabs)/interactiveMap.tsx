@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import MapView, { Marker, AnimatedRegion, LatLng } from 'react-native-maps';
-import { useUserLocation } from '@/context/UserLocationContext';
-import { useTasks } from '@/context/TasksContext';
+import { useUserLocation } from '../../context/UserLocationContext';
+import { useTasks } from '../../context/TasksContext';
+import React from 'react';
 
 export default function MapTasksScreen() {
   const mapRef = useRef<MapView>(null);

@@ -6,7 +6,8 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#ffffff",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
@@ -15,7 +16,14 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "FOREGROUND_SERVICE",
+        "POST_NOTIFICATIONS"
+      ],
+      "package": "com.nicolasngu23.tasksTrack"
     },
     "web": {
       "bundler": "metro",
@@ -24,6 +32,8 @@
     },
     "plugins": [
       "expo-router",
+      "expo-location",
+      "expo-notifications",
       [
         "expo-splash-screen",
         {
@@ -45,11 +55,14 @@
         "projectId": "7b7bd3f7-c224-42d1-8ddb-d77a83df6076"
       }
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/7b7bd3f7-c224-42d1-8ddb-d77a83df6076"
+    },
+    "notification": {
+      "color": "#0003bd",
+      "androidMode": "default",
+      "androidCollapsedTitle": "Tâches à proximité"
     }
   }
 }

@@ -1,8 +1,9 @@
+import React from 'react';
 import { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
-import { supabase } from '@/lib/supabase';
-import LoginScreen from '@/components/Login';
-import Dashboard from '@/components/Dashboard';
+import { supabase } from '../../lib/supabase';
+import LoginScreen from '../../components/Login';
+import Dashboard from '../../components/Dashboard';
 
 export default function IndexPage() {
   const [isLoading, setIsLoading] = useState(true);

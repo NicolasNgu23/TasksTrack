@@ -1,62 +1,103 @@
-import * as Notifications from 'expo-notifications'; // Importation correcte
+import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
-import { supabase } from './supabase'; // Assurez-vous que vous importez le bon fichier de configuration Supabase
+import * as Notifications from 'expo-notifications';
+import { supabase } from '@/lib/supabase';
 
-// Fonction pour vérifier la distance et envoyer des notifications en arrière-plan
-export const startBackgroundTracking = async () => {
-  const { status } = await Location.requestForegroundPermissionsAsync();
-  if (status !== 'granted') {
-    console.error('Permission refusée pour accéder à la localisation');
-    return;
-  }
+const TASK_NAME = 'BACKGROUND_PROXIMITY_CHECK';
 
-  const { data: tasks, error } = await supabase
-    .from('tasks')
-    .select('*')
-    .eq('done', false); // Récupérer uniquement les tâches non terminées
+const DISTANCE_THRESHOLD_METERS = 300;
 
-  if (error || !tasks) {
-    console.error('Erreur lors de la récupération des tâches ou tâches vides');
-    return;
-  }
-
-  const location = await Location.getCurrentPositionAsync({});
-  const { latitude: userLat, longitude: userLon } = location.coords;
-
-  // Pour chaque tâche non terminée, vérifier la distance et envoyer une notification si l'utilisateur est proche
-  tasks.forEach((task: any) => {
-    if (task.latitude && task.longitude) {
-      const dist = calculateDistance(userLat, userLon, task.latitude, task.longitude);
-
-      if (dist <= 1) { // Si la distance est inférieure ou égale à 1 km
-        sendNotification(task); // Appeler la fonction pour envoyer la notification
-      }
-    }
+const getTasks = async () => {
+  const user = (await supabase.auth.getUser()).data.user;
+  const { data } = await supabase.rpc('get_tasks_with_location', {
+    p_user_id: user?.id,
   });
+
+  if (!data) return [];
+
+  return data
+    .filter((t: any) => !t.done && t.location)
+    .map((task: any) => {
+      const match = task.location.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
+      if (!match) return null;
+      return {
+        id: task.id,
+        title: task.title,
+        latitude: parseFloat(match[2]),
+        longitude: parseFloat(match[1]),
+      };
+    })
+    .filter(Boolean);
 };
 
-// Calculer la distance entre deux points (en km)
-const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-  const R = 6371; // Rayon de la Terre en km
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+const haversineDistance = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number => {
+  const toRad = (x: number) => (x * Math.PI) / 180;
+  const R = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
       Math.sin(dLon / 2) *
       Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c; // Distance en km
+  return R * c;
 };
 
-// Envoyer une notification si l'utilisateur est proche de la tâche
-const sendNotification = async (task: any) => {
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: `Proche de la tâche: ${task.title}`,
-      body: task.description || 'N\'oublie pas de la compléter!',
-    },
-    trigger: null, // Envoie la notification immédiatement
-  });
+TaskManager.defineTask(TASK_NAME, async () => {
+  try {
+    const { coords } = await Location.getCurrentPositionAsync({});
+    const tasks = await getTasks();
+
+    for (const task of tasks) {
+      const distance = haversineDistance(
+        coords.latitude,
+        coords.longitude,
+        task.latitude,
+        task.longitude
+      );
+
+      if (distance < DISTANCE_THRESHOLD_METERS) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'Tâche à proximité 🧭',
+            body: `Tu es proche de la tâche : ${task.title}`,
+            sound: true,
+          },
+          trigger: null,
+        });
+        break;
+      }
+    }
+  } catch (error) {
+    console.log('Erreur dans la tâche de fond :', error);
+  }
+});
+
+export const startBackgroundTracking = async () => {
+  const { status } = await Location.requestForegroundPermissionsAsync();
+  const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
+  const notifStatus = await Notifications.requestPermissionsAsync();
+
+  if (status !== 'granted' || bgStatus !== 'granted' || notifStatus.status !== 'granted') {
+    console.log('Permissions insuffisantes');
+    return;
+  }
+
+  const isRegistered = await TaskManager.isTaskRegisteredAsync(TASK_NAME);
+  if (!isRegistered) {
+    await Location.startLocationUpdatesAsync(TASK_NAME, {
+      accuracy: Location.Accuracy.Balanced,
+      timeInterval: 10 * 60 * 1000,
+      distanceInterval: 0,
+      showsBackgroundLocationIndicator: false,
+      pausesUpdatesAutomatically: false,
+    });
+  }
 };
