@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { HapticTab } from '@/components/HapticTab';
-import { IconSymbol } from '@/components/ui/IconSymbol';
 import TabBarBackground from '@/components/ui/TabBarBackground';
 
 export default function TabLayout() {
@@ -24,7 +24,9 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="home" size={28} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -33,7 +35,16 @@ export default function TabLayout() {
           title: '',
           tabBarLabel: '',
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={32} name="plus.circle.fill" color={color} />
+            <Ionicons name="add-circle" size={28} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="interactiveMap"
+        options={{
+          title: 'Carte',
+          tabBarIcon: ({ color }) => (
+            <Ionicons name="map" size={26} color={color} />
           ),
         }}
       />

@@ -3,13 +3,13 @@
   "compilerOptions": {
     "strict": true,
     "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    },
     "moduleResolution": "node",
     "jsx": "react-native",
     "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "paths": {
-      "@/*": ["./*"]
-    }
+    "resolveJsonModule": true
   },
   "include": [
     "**/*.ts",

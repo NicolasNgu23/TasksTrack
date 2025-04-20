@@ -7,9 +7,11 @@ import * as Location from 'expo-location';
 import CustomInput from '@/components/CustomInput';
 import CustomButton from '@/components/CustomButton';
 import { useUserLocation } from '@/context/UserLocationContext';
+import { useTasks } from '@/context/TasksContext';
 
 export default function AddTaskScreen() {
-  const { location, refreshLocation } = useUserLocation();
+  const { location } = useUserLocation();
+  const { refreshTasks } = useTasks();
   const [title, setTitle] = useState('');
   const [desc, setDesc] = useState('');
   const [address, setAddress] = useState('');
@@ -61,7 +63,7 @@ export default function AddTaskScreen() {
       } else {
         Alert.alert('Adresse introuvable');
       }
-    } catch (err) {
+    } catch {
       Alert.alert('Erreur lors du géocodage');
     }
   };
@@ -76,7 +78,6 @@ export default function AddTaskScreen() {
 
     const lat = marker?.latitude ?? location?.latitude;
     const lon = marker?.longitude ?? location?.longitude;
-
     const point = `POINT(${lon} ${lat})`;
 
     const { error } = await supabase.rpc('create_task', {
@@ -89,6 +90,7 @@ export default function AddTaskScreen() {
     if (error) {
       Alert.alert('Erreur', error.message);
     } else {
+      await refreshTasks();
       setTitle('');
       setDesc('');
       setAddress('');
@@ -96,7 +98,6 @@ export default function AddTaskScreen() {
       router.replace('/');
     }
   };
-
 
   return (
     <View style={styles.container}>
